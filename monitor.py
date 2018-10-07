@@ -5,26 +5,28 @@ import calendar
 import http.client
 import smtplib
 import os
+from pathlib import Path
 from email.mime.text import MIMEText
 
-sendingThreshold = 1*60 # 1 minutes
+sendingThreshold = 5*60 # 5 minutes
+imageThreshold = 1*60 # 1 minute
 
-def cleanup():
+def trigger():
   global lastsent
-  global movements
+  global lastimage
 
+  image = None
   now = calendar.timegm(time.gmtime())
-  threshold = now - 30 # remove any movements older than 30 seconds
-  for m in movements:
-    if m < threshold:
-      movements.remove(m)
-    else:
-      if lastsent + sendingThreshold < now:
-        sendmail()
-        getimage()
-        lastsent = now
+  if (lastimage + imageThreshold < now):
+    image = getimage()
+    lastimage = now
 
-      print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(m)))
+  emailfile = Path('email-flag')
+  if (lastsent + sendingThreshold < now) and (emailfile.is_file()):
+    sendmail(image)
+    lastsent = now
+
+  print('Triggered ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(now)))
 
 def getimage():
   host = os.environ['CAMERA_HOST']
@@ -33,12 +35,14 @@ def getimage():
   headers = { 'Authorization': 'Basic ' + os.environ['CAMERA_AUTH_KEY'] }
   conn.request('GET', path, None, headers)
   resp = conn.getresponse() 
-  f = open(str(calendar.timegm(time.gmtime())) + '.jpg', 'wb')
+  image = 'captured_images/' + str(calendar.timegm(time.gmtime())) + '.jpg'
+  f = open(image, 'wb')
   f.write(resp.read())
   f.close()
-  print(resp.status)
+  print('Image captured with http response' + str(resp.status) + ' to image ' + image)
+  return image
 
-def sendmail():
+def sendmail(image):
   msg = MIMEText('Sample message')
   msg['Subject'] = 'Movement alert'
   msg['To'] = os.environ['MAIL_TO']
@@ -59,16 +63,14 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setup(11, GPIO.IN)
 GPIO.setup(12, GPIO.IN)
 
-movements = []
 lastsent = 0
+lastimage = 0
 
-cleanup()
 while True:
   i = GPIO.input(12)
   y = GPIO.input(11)
   if i == 1 and y == 1:
-    movements.append(calendar.timegm(time.gmtime())) # add epoch time
-    cleanup()
+    trigger()
 
   time.sleep(1)
 
