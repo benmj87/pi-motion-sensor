@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO
 import time
+import sys
 import ssl
 import calendar
 import http.client
@@ -79,10 +80,13 @@ lastsent = 0
 lastimage = 0
 
 while True:
-  i = GPIO.input(12)
-  y = GPIO.input(11)
-  if i == 1 and y == 1:
-    trigger()
+  try:
+    i = GPIO.input(12)
+    y = GPIO.input(11)
+    if i == 1 and y == 1:
+      trigger()
+  except Exception as e:
+    print("Unknown error " + str(e))
 
   time.sleep(1)
 
