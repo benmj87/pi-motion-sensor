@@ -21,12 +21,14 @@ def trigger():
   image = None
   now = calendar.timegm(time.gmtime())
   if (lastimage + imageThreshold < now):
-    image = getimage()
+    image1 = getimage()
+    time.sleep(1)
+    image2 = getimage()
     lastimage = now
 
     emailfile = Path('email-flag') # check email notifications are enabled using file exists
     if (lastsent + sendingThreshold < now) and (emailfile.is_file()):
-      sendmail(image)
+      sendmail(image1, image2)
       lastsent = now
 
   print('Triggered ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(now)))
@@ -47,7 +49,7 @@ def getimage():
   print('Image captured with http response' + str(resp.status) + ' to image ' + image)
   return image
 
-def sendmail(image):
+def sendmail(image1, image2):
   msg = MIMEMultipart()
   msg['Subject'] = 'Movement alert'
   msg['To'] = os.environ['MAIL_TO']
@@ -56,9 +58,12 @@ def sendmail(image):
   text = 'Monitoring triggered at ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
   msg.attach(MIMEText(text))
 
-  with open(image, 'rb') as file:
+  with open(image1, 'rb') as file:
     imageMime = MIMEImage(file.read(), _subtype = 'jpeg')
+  msg.attach(imageMime)
 
+  with open(image2, 'rb') as file:
+    imageMime = MIMEImage(file.read(), _subtype = 'jpeg')
   msg.attach(imageMime)
 
   s = smtplib.SMTP_SSL('in-v3.mailjet.com', 465)
